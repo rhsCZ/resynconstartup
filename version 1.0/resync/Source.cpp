@@ -30,18 +30,26 @@ int main(int argc, char** argv)
 			if (!strcmp(argv[i], "/setup") && strcmp(argv[i], "/task") && strcmp(argv[i], "/startup"))
 			{
 				char windir[500];
-				char buff2[500],file[500],cdrive[32];
+				char buff2[500],buff[500],file[500],cdrive[32],setservice[500];
 				TCHAR filex[200];
 				HKEY keyhandle;
 				GetEnvironmentVariable("systemroot", windir, sizeof(windir));
 				GetEnvironmentVariable("SystemDrive", cdrive, sizeof(cdrive));
-				sprintf_s(buff2, "%s\\System32\\schtasks.exe /create /F /sc ONCE /ST 12:00 /SD 01/01/2003 /tn \"Resync On Startup\" /tr \"%s\\resync.exe /task\" /ru System\0",windir,cdrive);
+				sprintf_s(buff2, "%s\\System32\\schtasks.exe /create /F /sc onlogon /tn \"Resync On Startup\" /tr \"%s\\resync.exe /task\" /ru System\0",windir,cdrive);
 				sprintf_s(file, "%s\\resync.exe", cdrive);
 				sprintf_s(filex, "%s\\resync.exe /startup\0", cdrive);
+				sprintf_s(setservice, "%s\\System32\\sc config w32time startup=auto",windir);
 				PROCESS_INFORMATION pi;
 				STARTUPINFO si = { sizeof(STARTUPINFO) };
 				si.cb = sizeof(STARTUPINFO);
 				if (!CreateProcess(NULL, buff2, NULL, NULL, FALSE, CREATE_NO_WINDOW|NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi))
+				{
+					exit(-1);
+				}
+				WaitForSingleObject(pi.hProcess, INFINITE);
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
+				if (!CreateProcess(NULL, setservice, NULL, NULL, FALSE, CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi))
 				{
 					exit(-1);
 				}
@@ -58,6 +66,26 @@ int main(int argc, char** argv)
 					exit(-1);
 				}
 				CloseHandle(keyhandle);
+				sprintf_s(buff, "net start w32time\0");
+				if (!CreateProcess(NULL, buff, NULL, NULL, FALSE, CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi))
+				{
+					exit(-1);
+				}
+				WaitForSingleObject(pi.hProcess, INFINITE);
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
+				memcpy(buff, 0, sizeof(buff));
+				sprintf_s(buff, "w32tm /resync /nowait\0");
+				if (!CreateProcess(NULL, buff, NULL, NULL, FALSE, CREATE_NO_WINDOW | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi))
+				{
+					exit(-1);
+				}
+				WaitForSingleObject(pi.hProcess, INFINITE);
+				CloseHandle(pi.hProcess);
+				CloseHandle(pi.hThread);
+				memcpy(buff, 0, sizeof(buff));
+				sprintf_s(buff, "net stop w32time\0");
+				exit(0);
 				MessageBox(NULL, "Installation Was Completed.", "Completed Install", MB_OK | MB_ICONINFORMATION | MB_DEFBUTTON1);
 				exit(0);
 				
